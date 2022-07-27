@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Album;
 use App\Models\Artist;
 use App\Models\MediaFile;
+use App\Models\PlaylistHasTrack;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +56,7 @@ class MediaFileController extends Controller
                     'track_path' => $track_path['path'],
                     'track_image' => $image_path['path'],
                     'launched_date' => $request->input('launched_date'),
+                    'for_download' => $request->input('for_download'),
                     'user_id' => Auth::user()->id,
                     'created_at' => date('Y-m-d H:i:s')
                 ]);
@@ -63,6 +65,31 @@ class MediaFileController extends Controller
             }
             return response()->json(['saved'=> false, 'error' => 'Upload track failed! There is something
             wrong in server.'], 201);
+
+        } catch (\Throwable $th) {
+            return response()->json(['saved'=>false,'errors'=> $th,'message'=> $th->getMessage()],201);
+        }
+    }
+
+    public function update(Request $request, $id){
+
+        try {
+                $feat = '';
+                if($request->input('feat') !='' && $request->input('feat') !='null'
+                && $request->input('feat') !=null){
+                    $feat = 'feat. '.$request->input('feat');
+                }
+                $mf = MediaFile::find($id)
+                ->update([
+                    'artist' => $request->input('artist'),
+                    'title' => $request->input('title_mediafile'),
+                    'feat' => $feat,
+                    'genre' => $request->input('genre'),
+                    'for_download' => $request->input('for_download'),
+                    'launched_date' => $request->input('launched_date'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+                return response()->json(['saved'=> true, 'message'=>'Track updated successfull!'], 200);
 
         } catch (\Throwable $th) {
             return response()->json(['saved'=>false,'errors'=> $th,'message'=> $th->getMessage()],201);
@@ -119,5 +146,31 @@ class MediaFileController extends Controller
             $name
         );*/
         return Storage::download($path, $name);
+    }
+
+    public function destroy($id){
+        try {
+            DB::beginTransaction();
+
+            $mf = MediaFile::find($id);
+            $pl = PlaylistHasTrack::where('mediafile_id', $mf->id)
+                ->delete();
+
+            $rs3 = MediaFile::destroy($mf->id);
+
+            if($mf){
+                $rs1 = Storage::delete($mf->track_path);
+                $rs2 = Storage::delete($mf->track_image);
+
+                DB::commit();
+                return response()->json(['deleted'=>true],200);
+            }
+            DB::rollBack();
+            return response()->json(['deleted'=>false],201);
+
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            return response()->json(['errors'=>$th,'error'=>$th->getMessage()],201);
+        }
     }
 }

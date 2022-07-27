@@ -20,6 +20,10 @@ class CreateUsersTable extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->text('avatar')->nullable();
+            $table->enum('agree',['0','1'])->default('0');
+            $table->enum('notify_me',['0','1'])->default('0');
+            $table->integer('upload_limit')->nullable();
+            $table->bigInteger('total_uploads')->default(0);
             $table->rememberToken();
             $table->timestamps();
         });

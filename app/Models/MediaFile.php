@@ -12,12 +12,14 @@ class MediaFile extends Model
     protected $fillable = [
         'artist',
         'title',
+        'original_name',
         'feat',
         'genre',
         'track_path',
         'track_image',
         'launched_date',
         'user_id',
+        'for_download',
         'created_at',
         'updated_at'
     ];

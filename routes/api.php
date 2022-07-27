@@ -54,3 +54,4 @@ Route::group(['middleware' => ['auth:sanctum']], function(){
     Route::resource('subscribe', SubscriberController::class);
 });
 Route::get('/media-download', [MediaFileController::class, 'down']);
+Route::get('/get/playlist/{userid}/{name}', [PlaylistController::class, 'getPlaylist']);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\UserRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -35,7 +36,7 @@ class UserController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(UserRequest $request)
     {
         /*if(Storage::disk('s3')->exists('tutorial.pdf')){
                 return Storage::download('tutorial.pdf');
@@ -51,9 +52,20 @@ class UserController extends Controller
                     'public'
                 );
             }
+            $array = explode(' ', $request->input('name'));
+            $name ='';
+            if(count($array) >0){
+                for ($i=0; $i < count($array); $i++) {
+                    $name .= $array[$i];
+                }
+            }
             $user = User::create([
-                'name' =>$request->input('name'),
+                'name' => empty($name) ? $request->input('name') : $name,
                 'email' => $request->input('email'),
+                'agree' => $request->input('agree'),
+                'notify_me' => $request->input('notify'),
+                'upload_limit' => $request->input('upload_limit'),
+                'total_uploads' => 0,
                 'password' => bcrypt($request->input('password')),
                 'avatar' => $avatarPath,
             ]);
@@ -68,7 +80,7 @@ class UserController extends Controller
             return response()->json($response, 200);
 
         } catch (\Throwable $th) {
-            return response()->json(['save'=>false,'error'=> $th,'error_message'=> $th->getMessage()],422);
+            return response()->json(['save'=>false,'error'=> $th,'error_message'=> $th->getMessage()],201);
         }
     }
 
@@ -103,15 +115,38 @@ class UserController extends Controller
      */
     public function update(Request $request, $id)
     {
-        if($request->hasFile('file')){
-            $path = $request->file('file')->storeAs(
-                'avatars',
-                $request->file->getClientOriginalName(),
-                'public'
-            );
-            return response()->json(['success' => true, 'path'=> $path],200);
-        }else{
-            return response()->json(['success' => false],404);
+        $avatarPath = 'images/user-admin.png';
+        try {
+            if($request->hasFile('avatar')){
+                $file = $request->file('avatar');
+                $name = $file->hashName();
+                $avatarPath = $request->file('avatar')->storeAs(
+                    'avatars',
+                    $file->hashName(),
+                    'public'
+                );
+            }
+            $user = User::find($id)
+            ->update([
+                'name' =>$request->input('name'),
+                'email' => $request->input('email'),
+                'agree' => $request->input('agree'),
+                'notify_me' => $request->input('notify'),
+                'password' => bcrypt($request->input('password')),
+                'avatar' => $avatarPath,
+            ]);
+
+            $token = $user->createToken('vynil')->plainTextToken;
+
+            $response = [
+                'user' => $user,
+                'token' => $token
+            ];
+
+            return response()->json($response, 200);
+
+        } catch (\Throwable $th) {
+            return response()->json(['save'=>false,'error'=> $th,'error_message'=> $th->getMessage()],201);
         }
     }
 

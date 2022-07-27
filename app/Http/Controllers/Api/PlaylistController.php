@@ -21,24 +21,16 @@ class PlaylistController extends Controller
      */
     public function index()
     {
-        $playlist = Playlist::join('media_files', 'playlists.mediafile_id', '=', 'media_files.id')
-        ->join('albums', 'media_files.album_id', '=', 'albums.id')
-        ->join('artists', 'albums.artist_id', '=', 'artists.id')
-        ->select('playlists.*', 'artists.artist', 'artists.fullname',
-        'artists.fullname', 'albums.title as album_title', 'albums.year_', 'albums.date_time', 'albums.style',
-        'media_files.*')
-        ->where('playlists.name','=','Default')
-        ->get();
-        return response()->json($playlist);
+        try {
+            $playlist = Playlist::all();
+            return response()->json($playlist);
+        } catch (\Throwable $th) {
+            //throw $th;
+            return response()->json(['errors'=> $th, 'error' => $th->getMessage()],201);
+        }
     }
 
     public function getAllPlaylists($userID){
-
-        /*$playlist = Playlist::distinct('name')
-        ->select('name')
-        ->groupBy('name')
-        ->where('user_id','=', $userID)
-        ->get(); */
         $playlist = Playlist::where('user_id','=', $userID)
         ->get();
         return response()->json($playlist);
@@ -46,24 +38,23 @@ class PlaylistController extends Controller
 
     public function getPlaylist($userID, $name){
 
-        $list = PlaylistHasTrack::join('media_files', 'playlist_has_tracks.mediafile_id', '=', 'media_files.id')
-        ->join('playlists', 'playlist_has_tracks.playlist_id', '=', 'playlists.id')
-        ->select('media_files.*', 'playlist_has_tracks.playlist_id','playlist_has_tracks.mediafile_id',
-        'playlists.name', 'playlists.created_at as playlist_date')
-        ->where('playlists.user_id', $userID)
-        ->where(function($query) use ($name){
-            $query->where('playlists.id', $name)
-            ->orWhere('playlists.name', $name);
-        })
-        ->get();
+        try {
+            $list = PlaylistHasTrack::join('media_files', 'playlist_has_tracks.mediafile_id', '=', 'media_files.id')
+            ->join('playlists', 'playlist_has_tracks.playlist_id', '=', 'playlists.id')
+            ->select('media_files.*', 'playlist_has_tracks.playlist_id','playlist_has_tracks.mediafile_id',
+            'playlists.name', 'playlists.created_at as playlist_date')
+            ->where('playlists.user_id', $userID)
+            ->where(function($query) use ($name){
+                $query->where('playlists.id', $name)
+                ->orWhere('playlists.name', $name);
+            })
+            ->get();
 
-        if($list){
             return response()->json($list);
+
+        } catch (\Throwable $th) {
+            return response()->json(['errors'=> $th, 'error' => $th->getMessage()],201);
         }
-        return response()->json([
-            'list'=> $list,
-            'message' => 'The password is wrong! '
-        ],202);
     }
 
     /**
@@ -138,11 +129,17 @@ class PlaylistController extends Controller
                 $count =0;
 
                 for ($i=0; $i < count($tracks); $i++) {
-                    PlaylistHasTrack::create([
-                        'playlist_id' => $request->playlistID,
-                        'mediafile_id' => $tracks[$i],
-                        'created_at' => date('Y-m-d H:i:s')
-                    ]);
+                    $rs = PlaylistHasTrack::where('playlist_id', $request->playlistID)
+                    ->where('playlist_id', $request->playlistID)
+                    ->where('mediafile_id', $tracks[$i])
+                    ->first();
+                    if(!$rs){
+                        PlaylistHasTrack::create([
+                            'playlist_id' => $request->playlistID,
+                            'mediafile_id' => $tracks[$i],
+                            'created_at' => date('Y-m-d H:i:s')
+                        ]);
+                    }
                     $count ++;
                 }
 
@@ -221,13 +218,20 @@ class PlaylistController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
-    {
+    public function destroy($id){
         try {
+            DB::beginTransaction();
 
+            $mf = Playlist::destroy($id);
+            $pl = PlaylistHasTrack::where('playlist_id', $id)
+                ->delete();
+
+                DB::commit();
+            return response()->json(['deleted'=>true],200);
 
         } catch (\Throwable $th) {
-            return response()->json(['errors'=>$th,'error'=>$th->getMessage()],422);
+            DB::rollBack();
+            return response()->json(['errors'=>$th,'error'=>$th->getMessage()],201);
         }
     }
 }
